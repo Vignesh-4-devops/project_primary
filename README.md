@@ -1,10 +1,10 @@
- # Container ID Display Application
+ # Site Technologies Display Application
 
-A simple Flask web application that displays the container ID when accessed. This application is containerized using Docker.
+A simple Flask web application that displays the Site Technologies when accessed. This application is containerized using Docker.
 
 ## Project Structure
 
-- `app.py`: Main Flask application that displays the container ID
+- `app.py`: Main Flask application that displays the Site Technologies
 - `requirements.txt`: Python dependencies
 - `Dockerfile`: Container configuration file
 
@@ -16,41 +16,21 @@ A simple Flask web application that displays the container ID when accessed. Thi
 
 ## Setup and Running
 
-### Local Development
-
-1. Create a virtual environment (optional but recommended):
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. Run the application:
-   ```bash
-   python app.py
-   ```
-   The application will be available at http://localhost:8080
 
 ### Using Docker
 
-1. Build the Docker image:
-   ```bash
-   docker build -t container-id-app .
-   ```
+1. Just run ./run_analyzer.sh and app is ready to role.
 
-2. Run the container:
-   ```bash
-   docker run -p 8080:8080 container-id-app
-   ```
-   The application will be available at http://localhost:8080
+2. The you can access the app on localhost 8080.
+
+Example url - http://localhost:8080/site_info?url=https://www.amazon.com
+
+FYI: Using Gunicorn (Recommended for Production)
+
 
 ## Features
 
-- Displays the container ID of the running instance
+- Displays the Site Technologies of the running instance, supports concurrency.
 - Runs on port 8080
 - Lightweight Python Flask application
 - Containerized for easy deployment 

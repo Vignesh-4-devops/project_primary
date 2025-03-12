@@ -1,20 +1,21 @@
-# Use Python 3.7 base image
-FROM python:3.7-slim
+# Use a more recent Python version
+FROM python:3.11-slim
 
 # Set working directory
 WORKDIR /app
 
-# Copy requirements file
+# Copy only requirements first to leverage Docker cache
 COPY requirements.txt .
 
 # Install dependencies
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the application
+# Copy the rest of the application code
 COPY app.py .
 
-# Expose port 8080
-EXPOSE 8080
+# Set a non-root user for security
+RUN useradd -m appuser
+USER appuser
 
 # Run the application
-CMD ["python", "app.py"] 
+CMD ["python", "app.py"]

@@ -13,8 +13,8 @@ if [ -z "$IMAGE_TAG" ]; then
     exit 1
 fi
 
-CONTAINER_NAME="test_container"
-IMAGE_NAME="flask-app:${IMAGE_TAG}"
+CONTAINER_NAME="site-analyzer"
+IMAGE_NAME="site-analyzer:${IMAGE_TAG}"
 
 # Cleanup function
 cleanup() {
