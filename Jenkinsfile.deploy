@@ -1,0 +1,152 @@
+pipeline {
+    agent any
+    
+    environment {
+        DOCKER_HUB_CREDENTIALS = credentials('docker-hub-credentials')
+        DOCKER_IMAGE_NAME = 'flask-app'
+        DOCKER_IMAGE_TAG = "${BUILD_NUMBER}"
+        KUBECONFIG = credentials('kubeconfig')
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                // Clean workspace before cloning
+                cleanWs()
+                // Clone the repository
+                git branch: 'main',
+                    url: 'https://github.com/Vignesh-4-devops/project_primary.git'
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                dir('.') {
+                    script {
+                        // Build the Docker image with build number tag
+                        sh "docker build -t ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} ."
+                        // Also tag as latest
+                        sh "docker tag ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} ${DOCKER_IMAGE_NAME}:latest"
+                    }
+                }
+            }
+        }
+        
+        stage('Test image') {
+            steps {
+                script {
+                    try {
+                        def testExitCode = sh(script: "test_container.sh ${env.ER_TAG}", returnStatus: true)
+                        if (testExitCode != 0 && testExitCode != 124) {
+                            error "Container test failed with exit code: ${testExitCode}"
+                        }
+                    } catch (Exception e) {
+                        currentBuild.result = 'FAILURE'
+                        emailext (
+                            subject: "Test Failed: ${env.JOB_NAME} [${env.BUILD_NUMBER}]",
+                            body: "Test stage failed: ${e.message}",
+                            to: 'team@example.com'
+                        )
+                        throw e
+                    }
+                }
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                script {
+                    try {
+                        withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', usernameVariable: 'DOCKER_HUB_CREDENTIALS_USR', passwordVariable: 'DOCKER_HUB_CREDENTIALS_PSW')]) {
+                            sh "echo ${DOCKER_HUB_CREDENTIALS_PSW} | docker login -u ${DOCKER_HUB_CREDENTIALS_USR} --password-stdin"
+                            sh "docker push ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}"
+                            sh "docker push ${DOCKER_IMAGE_NAME}:latest"
+                            sh "docker logout"
+                        }
+                    } catch (Exception e) {
+                        currentBuild.result = 'FAILURE'
+                        emailext (
+                            subject: "Docker Push Failed: ${env.JOB_NAME} [${env.BUILD_NUMBER}]",
+                            body: "Docker push stage failed: ${e.message}",
+                            to: 'team@example.com'
+                        )
+                        throw e
+                    }
+                }
+            }
+        }
+        
+        stage('Deploy ?') {
+            steps {
+                script {
+                    env.DEPLOY = input(
+                        id: 'userInput',
+                        message: 'Deploy to server?',
+                        parameters: [
+                            choice(
+                                name: 'DEPLOY_CHOICE',
+                                choices: ['YES', 'NO'],
+                                description: 'Choose whether to deploy'
+                            )
+                        ]
+                    )
+                }
+            }
+        }
+        
+        stage('Deploy to Kubernetes') {
+            when {
+                expression { env.DEPLOY == 'YES' }
+            }
+            steps {
+                dir('kubernetes') {
+                    script {
+                        try {
+                            sh """
+                                sed -i.bak 's|image: .*|image: ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}|' deployment.yaml
+                                kubectl apply -f deployment.yaml
+                                kubectl apply -f service.yaml
+                                kubectl apply -f hpa.yaml
+                                kubectl rollout status deployment/container-id-app
+                            """
+                        } catch (Exception e) {
+                            currentBuild.result = 'FAILURE'
+                            emailext (
+                                subject: "Deployment Failed: ${env.JOB_NAME} [${env.BUILD_NUMBER}]",
+                                body: "Kubernetes deployment failed: ${e.message}",
+                                to: 'team@example.com'
+                            )
+                            throw e
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        success {
+            emailext (
+                subject: "Build Successful: ${env.JOB_NAME} [${env.BUILD_NUMBER}]",
+                body: "The build and deployment completed successfully.",
+                to: 'team@example.com'
+            )
+        }
+        failure {
+            emailext (
+                subject: "Build Failed: ${env.JOB_NAME} [${env.BUILD_NUMBER}]",
+                body: "The build or deployment failed. Please check the Jenkins console for details.",
+                to: 'team@example.com'
+            )
+        }
+        always {
+            script {
+                try {
+                    sh "docker rmi ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} ${DOCKER_IMAGE_NAME}:latest || true"
+                } catch (Exception e) {
+                    echo "Warning: Failed to clean up Docker images: ${e.message}"
+                }
+            }
+        }
+    }
+} 
