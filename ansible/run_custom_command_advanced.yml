@@ -1,0 +1,48 @@
+---
+- name: Run Custom Command on Selected Servers
+  hosts: "{{ target_hosts | default('all_machines') }}"
+  gather_facts: no
+  vars_prompt:
+    - name: target_hosts
+      prompt: "Enter target host group (all_machines, usa-region, or specific hostname)"
+      private: no
+      default: "all_machines"
+    - name: custom_command
+      prompt: "Enter the command you want to run on servers"
+      private: no
+      default: "echo 'No command specified'"
+    - name: become_user
+      prompt: "Enter user to run command as (leave empty for current user, 'root' for sudo)"
+      private: no
+      default: ""
+  
+  tasks:
+    - name: Display execution plan
+      debug:
+        msg: |
+          Execution Plan:
+          - Target hosts: {{ target_hosts }}
+          - Command: {{ custom_command }}
+          - User: {{ become_user if become_user else 'current user' }}
+      
+    - name: Execute custom command
+      shell: "{{ custom_command }}"
+      become: "{{ become_user | length > 0 }}"
+      become_user: "{{ become_user if become_user | length > 0 else omit }}"
+      register: command_output
+      
+    - name: Display command output
+      debug:
+        msg: "{{ command_output.stdout_lines }}"
+        verbosity: 1
+      
+    - name: Display command errors (if any)
+      debug:
+        msg: "{{ command_output.stderr_lines }}"
+        verbosity: 1
+      when: command_output.stderr_lines | length > 0
+      
+    - name: Display return code
+      debug:
+        msg: "Command return code: {{ command_output.rc }}"
+        verbosity: 1 

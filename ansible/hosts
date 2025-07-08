@@ -1,0 +1,14 @@
+[all_machines]
+ubuntu.usa-primary
+ubuntu.us-multi
+ubuntu.usa-secondary
+ubuntu.eu-primary
+ubuntu.eu-multi
+ubuntu.eu-secondary
+ubuntu.sea-primary
+ubuntu.sea-multi
+ubuntu.sea-secondary
+[usa-region]
+ubuntu.usa-primary
+ubuntu.us-multi
+ubuntu.usa-secondary

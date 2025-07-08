@@ -1,0 +1,87 @@
+---
+- name: Manage Systemd Service
+  hosts: "{{ target_hosts | default('all_machines') }}"
+  gather_facts: false
+  become: yes
+  
+  vars_prompt:
+    - name: target_hosts
+      prompt: "Enter target host group (all_machines, usa-region, or specific hostname)"
+      private: no
+      default: "all_machines"
+    - name: service_name
+      prompt: "Enter the service name (e.g., cloudinfra_aisearch_backend.service, docker.service)"
+      private: no
+    - name: service_action
+      prompt: "Enter the action (start, stop, restart, status)"
+      private: no
+  
+  tasks:
+    - name: Validate service action
+      fail:
+        msg: "Service action must be one of: start, stop, restart, status"
+      when: service_action not in ['start', 'stop', 'restart', 'status']
+    
+    - name: Check if service exists
+      systemd:
+        name: "{{ service_name }}"
+        daemon_reload: yes
+      register: service_check
+      failed_when: false
+    
+    - name: Fail if service does not exist
+      fail:
+        msg: "Service '{{ service_name }}' does not exist or is not a systemd service"
+      when: service_check.status is not defined or service_check.status.ActiveState == "inactive" and service_check.status.LoadState == "not-found"
+    
+    - name: Display service status before action
+      debug:
+        msg: |
+          Service: {{ service_name }}
+          Current Status: {{ service_check.status.ActiveState }}
+          Load State: {{ service_check.status.LoadState }}
+          Description: {{ service_check.status.Description }}
+    
+    - name: Manage service based on action
+      block:
+        - name: Start service
+          systemd:
+            name: "{{ service_name }}"
+            state: started
+            daemon_reload: yes
+          when: service_action == 'start'
+        
+        - name: Stop service
+          systemd:
+            name: "{{ service_name }}"
+            state: stopped
+            daemon_reload: yes
+          when: service_action == 'stop'
+        
+        - name: Restart service
+          systemd:
+            name: "{{ service_name }}"
+            state: restarted
+            daemon_reload: yes
+          when: service_action == 'restart'
+        
+        - name: Show service status
+          systemd:
+            name: "{{ service_name }}"
+            daemon_reload: yes
+          register: final_status
+          when: service_action == 'status'
+        
+        - name: Display final status
+          debug:
+            msg: |
+              Service: {{ service_name }}
+              Final Status: {{ final_status.status.ActiveState }}
+              Load State: {{ final_status.status.LoadState }}
+              Description: {{ final_status.status.Description }}
+          when: service_action == 'status'
+    
+    - name: Display action result
+      debug:
+        msg: "Successfully executed '{{ service_action }}' on service '{{ service_name }}'"
+      when: service_action in ['start', 'stop', 'restart'] 
